@@ -27,10 +27,10 @@ export default async function RegistroPage({ searchParams }: { searchParams: { e
             <span>SIGPAC</span>
           </div>
           <RegisterForm origin={origin} />
-          <div className="text-sm mt-6 text-center">
+          {/* <div className="text-sm mt-6 text-center">
             <span className="text-gray-600">¿Ya eres miembro? </span>
             <Link href="/" className="text-[var(--color-blue-1)] font-semibold hover:underline">Inicia Sesión</Link>
-          </div>
+          </div> */}
         </div>
 
         <div className="hidden lg:block relative bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1576091160550-2173dba999ef?q=80&w=2070&auto=format&fit=crop')" }}>
