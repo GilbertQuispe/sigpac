@@ -21,19 +21,34 @@ async function createSupabaseServer() {
 export async function login(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
-  const origin = formData.get('origin') as string
   const supabase = await createSupabaseServer()
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
     return redirect(`/?error=${encodeURIComponent(error.message)}`)
   }
-  redirect('/dashboard')
+  if (!authData.user) {
+    return redirect(`/?error=No se pudo iniciar sesión`)
+  }
+
+  const { data: userData } = await supabase
+    .from('usuario')
+    .select('idpersona, persona(idrol)')
+    .eq('id', authData.user.id)
+    .single()
+
+  const idrol = userData?.persona?.idrol
+
+  if (idrol === 1) {
+    redirect('/admin')
+  } else {
+    redirect('/dashboard')
+  }
 }
 
 export async function signup(formData: FormData) {
-  return redirect('/registro') // Botón Regístrate te manda al registro
+  return redirect('/registro')
 }
 
 export async function checkDni(formData: FormData) {
@@ -64,28 +79,25 @@ export async function register(formData: FormData) {
   const idpersona = formData.get('idpersona') as string
   const nombres = formData.get('nombres') as string
   const apellidos = formData.get('apellidos') as string
-  const idrol = formData.get('idrol') as string
   const usuario = formData.get('usuario') as string
+  
+  const headersList = await headers()
+  const host = headersList.get('host')?? 'localhost:3000'
+  const protocol = host.includes('localhost')? 'http' : 'https'
+  const origin = `${protocol}://${host}`
   
   const supabase = await createSupabaseServer()
 
   const { data: authData, error: authError } = await supabase.auth.signUp({ 
     email, 
     password,
-    options: { data: { nombres, apellidos, usuario }}
+    options: { 
+      emailRedirectTo: `${origin}/auth/callback`,
+      data: { idpersona, nombres, apellidos, usuario }
+    }
   })
   
   if (authError) redirect(`/registro?error=${encodeURIComponent(authError.message)}`)
-  if (!authData.user) redirect(`/registro?error=No se pudo crear el usuario`)
 
-  const { error: dbError } = await supabase.from('usuario').insert({
-    auth_id: authData.user.id,
-    idpersona: Number(idpersona),
-    email,
-    usuario
-  })
-
-  if (dbError) redirect(`/registro?error=${encodeURIComponent(dbError.message)}`)
-
-  redirect('/?success=Cuenta creada. Revisa tu correo para confirmar')
-}
+  redirect('/?success=Para confirmar la creación de usuario, revisa en la bandeja del correo electrónico registrado y confirma su dirección electrónica')
+} // <- Esta llave cierra register
