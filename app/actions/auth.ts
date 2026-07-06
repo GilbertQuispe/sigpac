@@ -3,6 +3,8 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
+
+
 async function createSupabaseServer() {
   const cookieStore = await cookies()
   return createServerClient(
@@ -18,38 +20,6 @@ async function createSupabaseServer() {
   )
 }
 
-export async function login(formData: FormData) {
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
-  const supabase = await createSupabaseServer()
-
-  const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password })
-
-  if (error) {
-    return redirect(`/?error=${encodeURIComponent(error.message)}`)
-  }
-  if (!authData.user) {
-    return redirect(`/?error=No se pudo iniciar sesión`)
-  }
-
-  const { data: userData } = await supabase
-    .from('usuario')
-    .select('idpersona, persona(idrol)')
-    .eq('id', authData.user.id)
-    .single()
-
-  const idrol = userData?.persona?.idrol
-
-  if (idrol === 1) {
-    redirect('/admin')
-  } else {
-    redirect('/dashboard')
-  }
-}
-
-export async function signup(formData: FormData) {
-  return redirect('/registro')
-}
 
 export async function checkDni(formData: FormData) {
   const dni = formData.get('dni') as string
@@ -73,31 +43,51 @@ export async function checkDni(formData: FormData) {
   return { success: true, persona: {...persona, usuario }}
 }
 
-export async function register(formData: FormData) {
+export async function register(prevState: any, formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  const password2 = formData.get('password2') as string
   const idpersona = formData.get('idpersona') as string
   const nombres = formData.get('nombres') as string
   const apellidos = formData.get('apellidos') as string
-  const usuario = formData.get('usuario') as string
+  const idrol = formData.get('idrol') as string
+  const origin = formData.get('origin') as string
   
-  const headersList = await headers()
-  const host = headersList.get('host')?? 'localhost:3000'
-  const protocol = host.includes('localhost')? 'http' : 'https'
-  const origin = `${protocol}://${host}`
-  
+  const usuario = `${nombres[0].toLowerCase()}${apellidos.replace(/\s/g, '').toLowerCase()}${idpersona}`
+
+  if (password !== password2) return { error: 'Las contraseñas no coinciden' }
+
   const supabase = await createSupabaseServer()
 
-  const { data: authData, error: authError } = await supabase.auth.signUp({ 
+  const { error: authError } = await supabase.auth.signUp({ 
     email, 
     password,
     options: { 
-      emailRedirectTo: `${origin}/auth/callback`,
-      data: { idpersona, nombres, apellidos, usuario }
+      emailRedirectTo: `${origin}/callback`,
+      data: { idpersona, nombres, apellidos, usuario} // <-- CLAVE: Guardar todo aquí
     }
   })
   
-  if (authError) redirect(`/registro?error=${encodeURIComponent(authError.message)}`)
+  if (authError) return { error: authError.message }
+  return { success: 'Revisa su correo para validar la creacion del usuario' }
+}
 
-  redirect('/?success=Para confirmar la creación de usuario, revisa en la bandeja del correo electrónico registrado y confirma su dirección electrónica')
-} // <- Esta llave cierra register
+
+
+// NUEVO: FUNCIÓN LOGIN
+export async function login(formData: FormData) {
+  const email = formData.get('email') as string
+  const password = formData.get('password') as string
+  const supabase = await createSupabaseServer()
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  if (error) {
+    return redirect(`/?error=${encodeURIComponent('Email o contraseña incorrectos')}`)
+  }
+
+  return redirect('/dashboard') // cambia esto por tu ruta principal
+}
